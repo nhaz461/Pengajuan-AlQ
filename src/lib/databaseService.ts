@@ -167,7 +167,6 @@ export const databaseService = {
     actorName: string,
     actorRole: string
   ): Promise<Submission> {
-    // Exact sum calculation for original_total
     const calculatedTotal = items.reduce((sum, item) => sum + Number(item.total_amount), 0);
 
     const { data: submission, error: subError } = await supabase
@@ -200,7 +199,11 @@ export const databaseService = {
         unit: item.unit,
         total_amount: Number(item.total_amount),
         notes: item.notes || null,
-        multi_factors: item.multi_factors ? JSON.stringify(item.multi_factors) : '[]'
+        multi_factors: item.multi_factors ? JSON.stringify(item.multi_factors) : '[]',
+        ssh_item_id: item.ssh_item_id || null,
+        ssh_status: item.ssh_status || 'BELUM_DITEMUKAN',
+        ssh_price: item.ssh_price || null,
+        ssh_diff: item.ssh_diff || null
       }));
 
       const { error: itemsError } = await supabase
@@ -231,7 +234,6 @@ export const databaseService = {
     actorName: string,
     actorRole: string
   ): Promise<void> {
-    // Verify it is still draft
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
     if (existing.status !== 'Draft') {
@@ -268,7 +270,11 @@ export const databaseService = {
         unit: item.unit,
         total_amount: Number(item.total_amount),
         notes: item.notes || null,
-        multi_factors: item.multi_factors ? JSON.stringify(item.multi_factors) : '[]'
+        multi_factors: item.multi_factors ? JSON.stringify(item.multi_factors) : '[]',
+        ssh_item_id: item.ssh_item_id || null,
+        ssh_status: item.ssh_status || 'BELUM_DITEMUKAN',
+        ssh_price: item.ssh_price || null,
+        ssh_diff: item.ssh_diff || null
       }));
 
       await supabase.from('submission_items').insert(itemsToInsert);
@@ -291,7 +297,7 @@ export const databaseService = {
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
     if (existing.status !== 'Draft') {
-      throw new Error('Hanya draft yang dapat dihapus. Pengajuan yang sudah diajukan atau disetujui tidak boleh dihapus.');
+      throw new Error('Hanya draft yang dapat dihapus. Pengajuan yang sudah diajukan tidak boleh dihapus.');
     }
 
     const { error } = await supabase
@@ -346,18 +352,19 @@ export const databaseService = {
   },
 
   // =========================================================================
-  // BENDAHARA ANALYSIS (Section I)
-  // Original items remain intact; changes stored in analysis_items
+  // BENDAHARA ANALYSIS & DRAFT ANGGARAN SIAP DICAIRKAN (Section D, E, G)
+  // Original items remain intact in submission_items;
+  // Finalized items saved into analysis_items.
   // =========================================================================
   async saveAnalysis(params: {
     submissionId: string;
     analysisItems: Omit<AnalysisItem, 'id' | 'submission_id'>[];
     treasurerNotes: string;
-    submitForApproval: boolean;
+    saveToDraftSiapDicairkan: boolean;
     actorName: string;
     actorRole: string;
   }): Promise<void> {
-    const { submissionId, analysisItems, treasurerNotes, submitForApproval, actorName, actorRole } = params;
+    const { submissionId, analysisItems, treasurerNotes, saveToDraftSiapDicairkan, actorName, actorRole } = params;
 
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
@@ -367,13 +374,13 @@ export const databaseService = {
       .filter(item => item.item_type !== 'REMOVED')
       .reduce((sum, item) => sum + Number(item.total_amount), 0);
 
-    const newStatus: SubmissionStatus = submitForApproval ? 'Menunggu Persetujuan' : 'Sedang Dianalisis';
+    const newStatus: SubmissionStatus = saveToDraftSiapDicairkan ? 'Draft Siap Dicairkan' : 'Sedang Dianalisis';
     const now = new Date().toISOString();
 
     // 1. Delete previous analysis items for this submission to maintain clean idempotent state
     await supabase.from('analysis_items').delete().eq('submission_id', submissionId);
 
-    // 2. Insert new analyzed items
+    // 2. Insert new analyzed items with dynamic multi-factors and SSH check status
     if (analysisItems.length > 0) {
       const recordsToInsert = analysisItems.map((item, idx) => ({
         submission_id: submissionId,
@@ -388,6 +395,10 @@ export const databaseService = {
         multi_factors: item.multi_factors ? JSON.stringify(item.multi_factors) : '[]',
         change_reason: item.change_reason || null,
         treasurer_notes: item.treasurer_notes || null,
+        ssh_item_id: item.ssh_item_id || null,
+        ssh_status: item.ssh_status || 'BELUM_DITEMUKAN',
+        ssh_price: item.ssh_price || null,
+        ssh_diff: item.ssh_diff || null,
         sort_order: idx + 1
       }));
 
@@ -399,6 +410,8 @@ export const databaseService = {
     }
 
     // 3. Update submission header
+    const diff = Number(existing.original_total) - approvedTotal;
+
     const { error: subError } = await supabase
       .from('submissions')
       .update({
@@ -414,106 +427,75 @@ export const databaseService = {
 
     if (subError) throw subError;
 
-    const diff = Number(existing.original_total) - approvedTotal;
     const pct = existing.original_total > 0 ? ((approvedTotal / existing.original_total) * 100).toFixed(1) : '0';
 
     await this.logAudit({
       userName: actorName,
       userRole: actorRole,
-      action: submitForApproval ? 'SUBMIT_ANALYSIS_APPROVAL' : 'SAVE_ANALYSIS_DRAFT',
+      action: saveToDraftSiapDicairkan ? 'SET_DRAFT_SIAP_DICAIRKAN' : 'SAVE_ANALYSIS_DRAFT',
       entity: 'submission',
       entityId: submissionId,
       oldValue: { status: existing.status, approved_total: existing.approved_total },
       newValue: { status: newStatus, approved_total: approvedTotal, selisih: diff, persentase: pct },
-      note: `Analisis bendahara disimpan: ${existing.submission_number} - Disetujui Rp${approvedTotal.toLocaleString('id-ID')} (${pct}%)`
+      note: saveToDraftSiapDicairkan
+        ? `Draft Anggaran Siap Dicairkan ditetapkan: ${existing.submission_number} sebesar Rp${approvedTotal.toLocaleString('id-ID')} (Selisih: Rp${diff.toLocaleString('id-ID')})`
+        : `Draft analisis bendahara disimpan: ${existing.submission_number}`
     });
   },
 
-  // =========================================================================
-  // APPROVAL WORKFLOW (Section J)
-  // =========================================================================
+  // Approve submission
   async approveSubmission(submissionId: string, notes: string, actorName: string, actorRole: string): Promise<void> {
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
-
     const now = new Date().toISOString();
-    const remaining = Number(existing.approved_total) - Number(existing.disbursed_total);
-
     const { error } = await supabase
       .from('submissions')
       .update({
-        status: 'Disetujui',
-        remaining_total: remaining,
+        status: 'Draft Siap Dicairkan',
         approved_by: actorName,
         approved_at: now,
-        treasurer_notes: notes || existing.treasurer_notes,
+        notes: notes ? `${existing.notes || ''} [Persetujuan: ${notes}]` : existing.notes,
         updated_at: now
       })
       .eq('id', submissionId);
-
     if (error) throw error;
-
     await this.logAudit({
       userName: actorName,
       userRole: actorRole,
       action: 'APPROVE_SUBMISSION',
       entity: 'submission',
       entityId: submissionId,
-      oldValue: { status: existing.status },
-      newValue: { status: 'Disetujui', approved_total: existing.approved_total },
-      note: `Pengajuan disetujui: ${existing.submission_number} sebesar Rp${Number(existing.approved_total).toLocaleString('id-ID')}`
+      newValue: { status: 'Draft Siap Dicairkan' },
+      note: `Pengajuan disetujui: ${existing.submission_number}`
     });
   },
 
-  async rejectSubmission(submissionId: string, reason: string, actorName: string, actorRole: string): Promise<void> {
+  // Reject submission
+  async rejectSubmission(submissionId: string, notes: string, actorName: string, actorRole: string): Promise<void> {
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
-
     const now = new Date().toISOString();
     const { error } = await supabase
       .from('submissions')
       .update({
         status: 'Ditolak',
-        rejection_reason: reason,
+        rejection_reason: notes,
         updated_at: now
       })
       .eq('id', submissionId);
-
     if (error) throw error;
-
     await this.logAudit({
       userName: actorName,
       userRole: actorRole,
       action: 'REJECT_SUBMISSION',
       entity: 'submission',
       entityId: submissionId,
-      oldValue: { status: existing.status },
-      newValue: { status: 'Ditolak', rejection_reason: reason },
-      note: `Pengajuan ditolak: ${existing.submission_number}. Alasan: ${reason}`
+      newValue: { status: 'Ditolak', rejection_reason: notes },
+      note: `Pengajuan ditolak: ${existing.submission_number} (Alasan: ${notes})`
     });
   },
 
-  // =========================================================================
-  // DISBURSEMENT (Pencairan Bertahap - Section J)
-  // =========================================================================
-  async getNextTransactionNumber(year: string): Promise<string> {
-    const prefix = `TRX/DISB/${year}/`;
-    const { data, error } = await supabase
-      .from('disbursements')
-      .select('transaction_number')
-      .like('transaction_number', `${prefix}%`)
-      .order('transaction_number', { ascending: false })
-      .limit(1);
-
-    if (error || !data || data.length === 0) {
-      return `${prefix}0001`;
-    }
-
-    const lastNumStr = data[0].transaction_number.split('/').pop() || '0';
-    const nextNum = parseInt(lastNumStr, 10) + 1;
-    return `${prefix}${nextNum.toString().padStart(4, '0')}`;
-  },
-
+  // Record actual payment disbursement
   async recordDisbursement(params: {
     submissionId: string;
     amount: number;
@@ -531,24 +513,18 @@ export const databaseService = {
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
 
-    if (existing.status !== 'Disetujui' && existing.status !== 'Siap Dicairkan' && existing.status !== 'Dicairkan Sebagian') {
-      throw new Error(`Pencairan dana hanya dapat dilakukan untuk pengajuan yang telah disetujui. Status saat ini: ${existing.status}`);
-    }
-
     const currentDisbursed = Number(existing.disbursed_total);
     const approvedTotal = Number(existing.approved_total);
     const newTotalDisbursed = currentDisbursed + amount;
 
-    // Strict validation: cannot disburse more than approved without revision
     if (newTotalDisbursed > approvedTotal) {
       const allowed = approvedTotal - currentDisbursed;
       throw new Error(`Total pencairan melebihi nominal disetujui! Sisa yang boleh dicairkan: Rp${allowed.toLocaleString('id-ID')}, permintaan: Rp${amount.toLocaleString('id-ID')}`);
     }
 
     const currentYear = new Date().getFullYear().toString();
-    const trxNumber = await this.getNextTransactionNumber(currentYear);
+    const trxNumber = `TRX/DISB/${currentYear}/${Date.now().toString().slice(-4)}`;
 
-    // 1. Insert disbursement record
     const { data: disb, error: disbError } = await supabase
       .from('disbursements')
       .insert([
@@ -571,11 +547,10 @@ export const databaseService = {
 
     if (disbError) throw disbError;
 
-    // 2. Determine new status: Dicairkan Sebagian vs Selesai Dicairkan
     const remainingTotal = approvedTotal - newTotalDisbursed;
     const newStatus: SubmissionStatus = remainingTotal <= 0 ? 'Selesai Dicairkan' : 'Dicairkan Sebagian';
 
-    const { error: subError } = await supabase
+    await supabase
       .from('submissions')
       .update({
         status: newStatus,
@@ -585,24 +560,22 @@ export const databaseService = {
       })
       .eq('id', submissionId);
 
-    if (subError) throw subError;
-
     await this.logAudit({
       userName: actorName,
       userRole: actorRole,
       action: 'RECORD_DISBURSEMENT',
       entity: 'disbursement',
       entityId: disb.id,
-      newValue: { trx: trxNumber, amount: amount, status: newStatus, remaining: remainingTotal },
-      note: `Pencairan dana dicatat: ${trxNumber} untuk ${existing.submission_number} sebesar Rp${amount.toLocaleString('id-ID')} (${newStatus})`
+      newValue: { trx: trxNumber, amount: amount, status: newStatus },
+      note: `Pencairan dana dicatat: ${trxNumber} sebesar Rp${amount.toLocaleString('id-ID')}`
     });
 
     return disb;
   },
 
   // =========================================================================
-  // DASHBOARD AGGREGATIONS (Section L)
-  // Exact calculations from Supabase without double counting!
+  // DASHBOARD AGGREGATIONS (Section I)
+  // Exact calculations without double counting
   // =========================================================================
   async getDashboardStats(filter?: {
     fiscalYear?: string;
@@ -638,51 +611,49 @@ export const databaseService = {
 
     const submissions = data || [];
 
-    // Consolidated metrics
     let totalCount = submissions.length;
     let totalDiajukan = 0;
-    let totalDisetujui = 0;
+    let totalHasilAnalisis = 0;
+    let totalDraftSiapDicairkan = 0;
     let totalDicairkan = 0;
-    let totalBelumDicairkan = 0;
     let pendingAnalysisCount = 0;
 
     submissions.forEach(sub => {
       totalDiajukan += Number(sub.original_total || 0);
 
-      // Only count approved and disbursed for submissions that reached approval
-      if (['Disetujui', 'Siap Dicairkan', 'Dicairkan Sebagian', 'Selesai Dicairkan'].includes(sub.status)) {
-        const approved = Number(sub.approved_total || 0);
-        const disbursed = Number(sub.disbursed_total || 0);
-        totalDisetujui += approved;
-        totalDicairkan += disbursed;
-        totalBelumDicairkan += (approved - disbursed);
+      if (['Sedang Dianalisis', 'Draft Siap Dicairkan', 'Disetujui', 'Siap Dicairkan', 'Dicairkan Sebagian', 'Selesai Dicairkan'].includes(sub.status)) {
+        totalHasilAnalisis += Number(sub.approved_total || 0);
       }
 
-      if (sub.status === 'Diajukan' || sub.status === 'Sedang Dianalisis') {
+      if (['Draft Siap Dicairkan', 'Disetujui', 'Siap Dicairkan', 'Dicairkan Sebagian', 'Selesai Dicairkan'].includes(sub.status)) {
+        totalDraftSiapDicairkan += Number(sub.approved_total || 0);
+        totalDicairkan += Number(sub.disbursed_total || 0);
+      }
+
+      if (sub.status === 'Diajukan') {
         pendingAnalysisCount++;
       }
     });
 
-    // Difference between submitted and approved (Selisih pengajuan dan persetujuan)
-    const totalSelisih = Math.max(0, totalDiajukan - totalDisetujui);
+    const totalSelisih = totalDiajukan - totalHasilAnalisis;
 
-    // Grouping by Unit
+    // Unit Recap
     const units = await this.getUnits();
     const unitRecap = units.map(unit => {
       const unitSubs = submissions.filter(s => s.unit_id === unit.id);
       let uDiajukan = 0;
-      let uDisetujui = 0;
+      let uAnalisis = 0;
+      let uSiapDicairkan = 0;
       let uDicairkan = 0;
-      let uBelumDicairkan = 0;
 
       unitSubs.forEach(s => {
         uDiajukan += Number(s.original_total || 0);
-        if (['Disetujui', 'Siap Dicairkan', 'Dicairkan Sebagian', 'Selesai Dicairkan'].includes(s.status)) {
-          const app = Number(s.approved_total || 0);
-          const disb = Number(s.disbursed_total || 0);
-          uDisetujui += app;
-          uDicairkan += disb;
-          uBelumDicairkan += (app - disb);
+        if (['Sedang Dianalisis', 'Draft Siap Dicairkan', 'Disetujui', 'Siap Dicairkan', 'Dicairkan Sebagian', 'Selesai Dicairkan'].includes(s.status)) {
+          uAnalisis += Number(s.approved_total || 0);
+        }
+        if (['Draft Siap Dicairkan', 'Disetujui', 'Siap Dicairkan', 'Dicairkan Sebagian', 'Selesai Dicairkan'].includes(s.status)) {
+          uSiapDicairkan += Number(s.approved_total || 0);
+          uDicairkan += Number(s.disbursed_total || 0);
         }
       });
 
@@ -692,19 +663,22 @@ export const databaseService = {
         unitName: unit.name,
         count: unitSubs.length,
         totalDiajukan: uDiajukan,
-        totalDisetujui: uDisetujui,
+        totalHasilAnalisis: uAnalisis,
+        totalSiapDicairkan: uSiapDicairkan,
         totalDicairkan: uDicairkan,
-        belumDicairkan: uBelumDicairkan,
-        selisih: Math.max(0, uDiajukan - uDisetujui)
+        belumDicairkan: Math.max(0, uSiapDicairkan - uDicairkan),
+        selisih: uDiajukan - uAnalisis
       };
     });
 
     return {
       totalCount,
       totalDiajukan,
-      totalDisetujui,
+      totalHasilAnalisis,
+      totalDraftSiapDicairkan,
+      totalDisetujui: totalDraftSiapDicairkan,
       totalDicairkan,
-      totalBelumDicairkan,
+      totalBelumDicairkan: Math.max(0, totalDraftSiapDicairkan - totalDicairkan),
       totalSelisih,
       pendingAnalysisCount,
       unitRecap,
@@ -712,9 +686,6 @@ export const databaseService = {
     };
   },
 
-  // =========================================================================
-  // AUDIT LOGS QUERY
-  // =========================================================================
   async getAuditLogs(limit = 100): Promise<AuditLog[]> {
     const { data, error } = await supabase
       .from('audit_logs')
@@ -726,9 +697,6 @@ export const databaseService = {
     return data || [];
   },
 
-  // =========================================================================
-  // BACKUP LOGS QUERY
-  // =========================================================================
   async getBackupLogs(): Promise<BackupLog[]> {
     const { data, error } = await supabase
       .from('backup_logs')

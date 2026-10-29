@@ -1,23 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './lib/authContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar, NavItemKey } from './components/Sidebar';
 import { DashboardPage } from './pages/DashboardPage';
 import { SubmissionPage } from './pages/SubmissionPage';
 import { AnalysisPage } from './pages/AnalysisPage';
-import { ApprovalPage } from './pages/ApprovalPage';
+import { DraftSiapDicairkanPage } from './pages/DraftSiapDicairkanPage';
+import { MasterSSHPage } from './pages/MasterSSHPage';
 import { DisbursementPage } from './pages/DisbursementPage';
-import { DisbursementReportPage } from './pages/DisbursementReportPage';
 import { UnitRecapPage } from './pages/UnitRecapPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { UsersSettingsPage } from './pages/UsersSettingsPage';
 import { BackupPage } from './pages/BackupPage';
+import { OperatorHistoryPage } from './pages/OperatorHistoryPage';
 
 const MainLayout: React.FC = () => {
-  const { currentUser, isLoading } = useAuth();
+  const { currentUser, isOperator, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<NavItemKey>('dashboard');
   const [navParams, setNavParams] = useState<any>(null);
   const [isOpenMobile, setIsOpenMobile] = useState(false);
+
+  // If Operator logs in, strictly restrict default view to 'submissions'
+  useEffect(() => {
+    if (isOperator && activeTab !== 'submissions' && activeTab !== 'operator-history') {
+      setActiveTab('submissions');
+    } else if (!isOperator && activeTab === 'operator-history') {
+      setActiveTab('dashboard');
+    }
+  }, [isOperator]);
 
   const handleNavigate = (tab: NavItemKey, params?: any) => {
     setActiveTab(tab);
@@ -30,7 +40,7 @@ const MainLayout: React.FC = () => {
       <div className="min-h-screen bg-finance-bg flex flex-col items-center justify-center p-4">
         <img src="/logo.svg" alt="Logo" className="w-14 h-14 mb-3 animate-pulse" />
         <div className="text-sm font-bold text-finance-navy">Yayasan Al-Qur'aniyyah</div>
-        <div className="text-xs text-slate-500 mt-1">Memuat Sistem Pengajuan & Pencairan Dana...</div>
+        <div className="text-xs text-slate-500 mt-1">Memuat Sistem Pengajuan Dana...</div>
       </div>
     );
   }
@@ -52,26 +62,38 @@ const MainLayout: React.FC = () => {
 
         {/* Dynamic Page Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-full">
-          {activeTab === 'dashboard' && <DashboardPage onNavigate={handleNavigate} />}
+          {/* Operator specific views */}
+          {isOperator && activeTab === 'operator-history' && (
+            <OperatorHistoryPage onNavigate={handleNavigate} />
+          )}
+
+          {/* Submissions (accessible by Operator and Bendahara) */}
           {activeTab === 'submissions' && <SubmissionPage onNavigate={handleNavigate} />}
-          {activeTab === 'analysis' && (
-            <AnalysisPage
-              initialSubmissionId={navParams?.submissionId}
-              onNavigate={handleNavigate}
-            />
+
+          {/* Bendahara views (Restricted from Operator) */}
+          {!isOperator && (
+            <>
+              {activeTab === 'dashboard' && <DashboardPage onNavigate={handleNavigate} />}
+              {activeTab === 'analysis' && (
+                <AnalysisPage
+                  initialSubmissionId={navParams?.submissionId}
+                  onNavigate={handleNavigate}
+                />
+              )}
+              {activeTab === 'draft-siap-dicairkan' && (
+                <DraftSiapDicairkanPage
+                  initialSubmissionId={navParams?.submissionId}
+                  onNavigate={handleNavigate}
+                />
+              )}
+              {activeTab === 'master-ssh' && <MasterSSHPage />}
+              {activeTab === 'disbursement' && <DisbursementPage onNavigate={handleNavigate} />}
+              {activeTab === 'unit-recap' && <UnitRecapPage />}
+              {activeTab === 'archive' && <ArchivePage onNavigate={handleNavigate} />}
+              {activeTab === 'settings' && <UsersSettingsPage />}
+              {activeTab === 'backup' && <BackupPage />}
+            </>
           )}
-          {activeTab === 'approval' && <ApprovalPage onNavigate={handleNavigate} />}
-          {activeTab === 'disbursement' && <DisbursementPage onNavigate={handleNavigate} />}
-          {activeTab === 'reports' && (
-            <DisbursementReportPage
-              initialSubmissionId={navParams?.submissionId}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {activeTab === 'unit-recap' && <UnitRecapPage />}
-          {activeTab === 'archive' && <ArchivePage onNavigate={handleNavigate} />}
-          {activeTab === 'settings' && <UsersSettingsPage />}
-          {activeTab === 'backup' && <BackupPage />}
         </main>
       </div>
     </div>

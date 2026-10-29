@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'BENDAHARA' | 'OPERATOR' | 'PENGELUARAN';
+export type UserRole = 'BENDAHARA' | 'OPERATOR' | 'ADMIN' | 'PENGELUARAN';
 
 export interface AppUser {
   id: string;
@@ -34,6 +34,7 @@ export type SubmissionStatus =
   | 'Diajukan'
   | 'Sedang Dianalisis'
   | 'Menunggu Persetujuan'
+  | 'Draft Siap Dicairkan'
   | 'Disetujui'
   | 'Siap Dicairkan'
   | 'Dicairkan Sebagian'
@@ -41,11 +42,27 @@ export type SubmissionStatus =
   | 'Ditolak'
   | 'Dibatalkan';
 
+export type SSHStatus = 'SESUAI' | 'MELEBIHI' | 'BELUM_DITEMUKAN';
+
 export interface MultiFactor {
   id: string;
   name: string;    // e.g. "Mata Pelajaran", "Siswa", "Angkatan", "Hari", "Orang"
   value: number;   // e.g. 14, 100, 3, 5, 20
   satuan: string;  // e.g. "Mapel", "Siswa", "Kelas", "Hari", "Orang"
+}
+
+export interface MasterSSH {
+  id: string;
+  kode_ssh?: string | null;
+  kategori: string;
+  nama_barang: string;
+  satuan: string;
+  harga_standar: number;
+  tahun_berlaku?: string;
+  keterangan?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SubmissionItem {
@@ -60,6 +77,10 @@ export interface SubmissionItem {
   total_amount: number;
   notes?: string;
   multi_factors?: MultiFactor[];
+  ssh_item_id?: string | null;
+  ssh_status?: SSHStatus;
+  ssh_price?: number | null;
+  ssh_diff?: number | null;
   created_at?: string;
 }
 
@@ -79,6 +100,10 @@ export interface AnalysisItem {
   multi_factors?: MultiFactor[];
   change_reason?: string;
   treasurer_notes?: string;
+  ssh_item_id?: string | null;
+  ssh_status?: SSHStatus;
+  ssh_price?: number | null;
+  ssh_diff?: number | null;
   sort_order?: number;
   created_at?: string;
 }

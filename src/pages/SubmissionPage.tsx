@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { databaseService } from '../lib/databaseService';
 import { excelService, ParsedExcelRow } from '../lib/excelService';
+import { sshService } from '../lib/sshService';
 import { useAuth } from '../lib/authContext';
-import { Unit, FiscalYear, Submission, SubmissionItem, MultiFactor } from '../types/database';
-import { StatusBadge } from '../components/StatusBadge';
+import { Unit, FiscalYear, Submission, SubmissionItem, MasterSSH } from '../types/database';
+import { StatusBadge, SSHBadge } from '../components/StatusBadge';
 import { MultiFactorCalculator } from '../components/MultiFactorCalculator';
 import {
   FileSpreadsheet,
@@ -34,6 +35,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
+  const [allSSH, setAllSSH] = useState<MasterSSH[]>([]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,14 +89,16 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
   const loadData = async () => {
     setLoading(true);
     try {
-      const [unitsData, yearsData, subsData] = await Promise.all([
+      const [unitsData, yearsData, subsData, sshData] = await Promise.all([
         databaseService.getUnits(),
         databaseService.getFiscalYears(),
-        databaseService.getSubmissions()
+        databaseService.getSubmissions(),
+        sshService.getMasterSSH()
       ]);
 
       setUnits(unitsData);
       setFiscalYears(yearsData);
+      setAllSSH(sshData);
 
       // Filter submissions based on role and unit
       if (currentUser?.role === 'OPERATOR' && currentUser.unit_id) {
@@ -275,6 +279,18 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
       const actorName = currentUser?.full_name || 'Operator';
       const actorRole = currentUser?.role || 'OPERATOR';
 
+      // Attach automatic SSH check results to every item
+      const enrichedItems = items.map(it => {
+        const sshCheck = sshService.checkPriceAgainstSSH(Number(it.unit_price) || 0, it.item_name, it.unit, allSSH);
+        return {
+          ...it,
+          ssh_item_id: sshCheck.sshItem?.id || null,
+          ssh_status: sshCheck.status,
+          ssh_price: sshCheck.sshPrice || null,
+          ssh_diff: sshCheck.diff || null,
+        };
+      });
+
       if (editingSubmissionId) {
         // Update existing draft
         await databaseService.updateDraft(
@@ -283,7 +299,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
             ...formData,
             status: status
           },
-          items,
+          enrichedItems,
           actorName,
           actorRole
         );
@@ -304,7 +320,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
             submitted_by: actorName,
             submitted_by_id: currentUser?.id
           },
-          items,
+          enrichedItems,
           actorName,
           actorRole
         );
@@ -395,18 +411,25 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
       return;
     }
 
-    // Map into form items
-    const importedItems: Array<Omit<SubmissionItem, 'id' | 'submission_id'>> = validRows.map((r, idx) => ({
-      item_number: idx + 1,
-      category: r.kategori || formData.category,
-      item_name: r.uraian,
-      unit_price: r.hargaSatuan,
-      volume: r.volume,
-      unit: r.satuan,
-      total_amount: r.jumlah,
-      notes: r.keterangan,
-      multi_factors: r.multiFactors || []
-    }));
+    // Map into form items with automatic SSH check
+    const importedItems: Array<Omit<SubmissionItem, 'id' | 'submission_id'>> = validRows.map((r, idx) => {
+      const sshCheck = sshService.checkPriceAgainstSSH(r.hargaSatuan, r.uraian, r.satuan, allSSH);
+      return {
+        item_number: idx + 1,
+        category: r.kategori || formData.category,
+        item_name: r.uraian,
+        unit_price: r.hargaSatuan,
+        volume: r.volume,
+        unit: r.satuan,
+        total_amount: r.jumlah,
+        notes: r.keterangan,
+        multi_factors: r.multiFactors || [],
+        ssh_item_id: sshCheck.sshItem?.id || null,
+        ssh_status: sshCheck.status,
+        ssh_price: sshCheck.sshPrice || null,
+        ssh_diff: sshCheck.diff || null,
+      };
+    });
 
     setItems(importedItems);
 
@@ -443,9 +466,13 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-finance-navy">Pengajuan Anggaran Unit</h1>
+          <h1 className="text-xl font-bold text-finance-navy">
+            {currentUser?.role === 'OPERATOR' ? 'Pengajuan Dana Unit' : 'Pengajuan Dana Masuk'}
+          </h1>
           <p className="text-xs text-slate-500">
-            Penyusunan Rencana Anggaran Biaya (RAB), impor spreadsheet Excel, dan pengajuan resmi ke Bendahara Yayasan.
+            {currentUser?.role === 'OPERATOR'
+              ? 'Penyusunan Rencana Anggaran Biaya (RAB), impor spreadsheet Excel, dan pengajuan resmi ke Bendahara Yayasan.'
+              : 'Daftar seluruh berkas pengajuan anggaran yang masuk dari unit-unit untuk ditinjau dan dianalisis.'}
           </p>
         </div>
 
@@ -797,87 +824,102 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
 
               {/* Items List */}
               <div className="space-y-3">
-                {items.map((item, idx) => (
-                  <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2.5">
-                    <div className="grid grid-cols-12 gap-2 items-start">
-                      <div className="col-span-1 text-center font-bold text-slate-400 text-xs pt-2">
-                        #{idx + 1}
+                {items.map((item, idx) => {
+                  const sshCheck = sshService.checkPriceAgainstSSH(Number(item.unit_price) || 0, item.item_name, item.unit, allSSH);
+                  return (
+                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2.5">
+                      <div className="grid grid-cols-12 gap-2 items-start">
+                        <div className="col-span-1 text-center font-bold text-slate-400 text-xs pt-2">
+                          #{idx + 1}
+                        </div>
+
+                        <div className="col-span-11 sm:col-span-5">
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Uraian Barang / Belanja Kegiatan <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Nama barang / kegiatan..."
+                            value={item.item_name}
+                            onChange={(e) => handleUpdateItem(idx, 'item_name', e.target.value)}
+                            className="w-full text-xs border border-slate-200 rounded p-1.5 focus:border-finance-blue"
+                          />
+                        </div>
+
+                        <div className="col-span-6 sm:col-span-3">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <label className="block text-[10px] font-semibold text-slate-500">
+                              Harga Satuan (Rp) <span className="text-red-500">*</span>
+                            </label>
+                            {item.item_name.trim() && (
+                              <SSHBadge status={sshCheck.status} diff={sshCheck.diff} size="sm" />
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="0"
+                            value={item.unit_price === 0 ? '' : item.unit_price}
+                            onChange={(e) => handleUpdateItem(idx, 'unit_price', e.target.value)}
+                            className={`w-full text-xs font-mono text-right border rounded p-1.5 focus:border-finance-blue font-semibold ${
+                              sshCheck.status === 'MELEBIHI' ? 'border-red-300 bg-red-50/40 text-red-700' : 'border-slate-200'
+                            }`}
+                          />
+                          {sshCheck.sshPrice && (
+                            <div className="text-[10px] text-slate-500 mt-0.5 text-right font-mono">
+                              SSH: Rp{sshCheck.sshPrice.toLocaleString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="col-span-5 sm:col-span-2">
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Satuan</label>
+                          <input
+                            type="text"
+                            placeholder="Rim / Kotak"
+                            value={item.unit}
+                            onChange={(e) => handleUpdateItem(idx, 'unit', e.target.value)}
+                            className="w-full text-xs border border-slate-200 rounded p-1.5"
+                          />
+                        </div>
+
+                        <div className="col-span-1 text-right pt-4">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                            title="Hapus baris"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="col-span-11 sm:col-span-5">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Uraian Barang / Belanja Kegiatan <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Nama barang / kegiatan..."
-                          value={item.item_name}
-                          onChange={(e) => handleUpdateItem(idx, 'item_name', e.target.value)}
-                          className="w-full text-xs border border-slate-200 rounded p-1.5 focus:border-finance-blue"
-                        />
-                      </div>
-
-                      <div className="col-span-6 sm:col-span-3">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Harga Satuan (Rp) <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="0"
-                          value={item.unit_price === 0 ? '' : item.unit_price}
-                          onChange={(e) => handleUpdateItem(idx, 'unit_price', e.target.value)}
-                          className="w-full text-xs font-mono text-right border border-slate-200 rounded p-1.5 focus:border-finance-blue font-semibold"
-                        />
-                      </div>
-
-                      <div className="col-span-5 sm:col-span-2">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Satuan</label>
-                        <input
-                          type="text"
-                          placeholder="Rim / Kotak"
-                          value={item.unit}
-                          onChange={(e) => handleUpdateItem(idx, 'unit', e.target.value)}
-                          className="w-full text-xs border border-slate-200 rounded p-1.5"
-                        />
-                      </div>
-
-                      <div className="col-span-1 text-right pt-4">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(idx)}
-                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                          title="Hapus baris"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Multi-Factor Volume Calculator Component (Section H) */}
-                    <MultiFactorCalculator
-                      unitPrice={Number(item.unit_price) || 0}
-                      factors={item.multi_factors || []}
-                      onChangeFactors={(factors) => handleUpdateItem(idx, 'multi_factors', factors)}
-                      onTotalCalculated={(total, volume) => {
-                        handleUpdateItem(idx, 'total_amount', total);
-                        handleUpdateItem(idx, 'volume', volume);
-                      }}
-                    />
-
-                    {/* Notes for this item */}
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Keterangan rincian (opsional)..."
-                        value={item.notes || ''}
-                        onChange={(e) => handleUpdateItem(idx, 'notes', e.target.value)}
-                        className="w-full text-[11px] text-slate-600 border border-slate-100 bg-slate-50/50 rounded px-2 py-1"
+                      {/* Multi-Factor Volume Calculator Component (Section H) */}
+                      <MultiFactorCalculator
+                        unitPrice={Number(item.unit_price) || 0}
+                        factors={item.multi_factors || []}
+                        onChangeFactors={(factors) => handleUpdateItem(idx, 'multi_factors', factors)}
+                        onTotalCalculated={(total, volume) => {
+                          handleUpdateItem(idx, 'total_amount', total);
+                          handleUpdateItem(idx, 'volume', volume);
+                        }}
                       />
+
+                      {/* Notes for this item */}
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Keterangan rincian (opsional)..."
+                          value={item.notes || ''}
+                          onChange={(e) => handleUpdateItem(idx, 'notes', e.target.value)}
+                          className="w-full text-[11px] text-slate-600 border border-slate-100 bg-slate-50/50 rounded px-2 py-1"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -1004,6 +1046,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                           <th className="px-3 py-2">No</th>
                           <th className="px-3 py-2">Uraian Barang/Kegiatan</th>
                           <th className="px-3 py-2 text-right">Harga (Rp)</th>
+                          <th className="px-3 py-2">Uji SSH</th>
                           <th className="px-3 py-2 text-center">Vol</th>
                           <th className="px-3 py-2">Satuan</th>
                           <th className="px-3 py-2 text-right">Jumlah (Rp)</th>
@@ -1011,31 +1054,37 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {excelPreview.parsedItems.map((item, idx) => (
-                          <tr key={idx} className={item.errors.length > 0 ? 'bg-red-50/50' : ''}>
-                            <td className="px-3 py-2 text-slate-500">{item.no || idx + 1}</td>
-                            <td className="px-3 py-2 font-medium text-slate-800">{item.uraian}</td>
-                            <td className="px-3 py-2 text-right font-mono">
-                              Rp{item.hargaSatuan.toLocaleString('id-ID')}
-                            </td>
-                            <td className="px-3 py-2 text-center">{item.volume}</td>
-                            <td className="px-3 py-2 text-slate-600">{item.satuan}</td>
-                            <td className="px-3 py-2 text-right font-mono font-semibold">
-                              Rp{item.jumlah.toLocaleString('id-ID')}
-                            </td>
-                            <td className="px-3 py-2">
-                              {item.errors.length === 0 ? (
-                                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">
-                                  Valid
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-medium" title={item.errors.join(', ')}>
-                                  Error
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {excelPreview.parsedItems.map((item, idx) => {
+                          const sshCheck = sshService.checkPriceAgainstSSH(item.hargaSatuan, item.uraian, item.satuan, allSSH);
+                          return (
+                            <tr key={idx} className={item.errors.length > 0 ? 'bg-red-50/50' : ''}>
+                              <td className="px-3 py-2 text-slate-500">{item.no || idx + 1}</td>
+                              <td className="px-3 py-2 font-medium text-slate-800">{item.uraian}</td>
+                              <td className="px-3 py-2 text-right font-mono">
+                                Rp{item.hargaSatuan.toLocaleString('id-ID')}
+                              </td>
+                              <td className="px-3 py-2">
+                                <SSHBadge status={sshCheck.status} diff={sshCheck.diff} size="sm" />
+                              </td>
+                              <td className="px-3 py-2 text-center">{item.volume}</td>
+                              <td className="px-3 py-2 text-slate-600">{item.satuan}</td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold">
+                                Rp{item.jumlah.toLocaleString('id-ID')}
+                              </td>
+                              <td className="px-3 py-2">
+                                {item.errors.length === 0 ? (
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">
+                                    Valid
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-medium" title={item.errors.join(', ')}>
+                                    Error
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

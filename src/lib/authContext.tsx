@@ -8,11 +8,12 @@ interface AuthContextType {
   setCurrentUser: (user: AppUser) => void;
   switchUserRole: (role: UserRole, unitId?: string | null) => void;
   isLoading: boolean;
-  canAccessUnit: (unitId: string) => boolean;
-  canPerformAnalysis: boolean;
+  isOperator: boolean;
+  isBendahara: boolean;
   canApprove: boolean;
   canDisburse: boolean;
   canManageSettings: boolean;
+  canAccessUnit: (unitId: string) => boolean;
   canManageDraft: (submissionUnitId: string, submissionStatus: string) => boolean;
 }
 
@@ -23,7 +24,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [usersList, setUsersList] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch registered users from Supabase app_users table
   useEffect(() => {
     async function loadUsers() {
       try {
@@ -34,12 +34,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('Error fetching app_users:', error);
-          // Fallback user if offline or starting up
           const fallbackUser: AppUser = {
-            id: 'admin-fallback',
-            email: 'admin@alquraniyyah.sch.id',
-            full_name: 'Administrator Yayasan',
-            role: 'ADMIN',
+            id: 'bendahara-default',
+            email: 'bendahara@alquraniyyah.sch.id',
+            full_name: 'Bendahara Umum Yayasan',
+            role: 'BENDAHARA',
             unit_id: null,
             is_active: true,
             created_at: new Date().toISOString()
@@ -51,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: u.id,
             email: u.email,
             full_name: u.full_name,
-            role: u.role as UserRole,
+            role: (u.role === 'ADMIN' ? 'BENDAHARA' : u.role) as UserRole,
             unit_id: u.unit_id,
             unit_name: u.units?.name,
             is_active: u.is_active,
@@ -59,7 +58,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
           setUsersList(mappedUsers);
 
-          // Restore previously selected user if stored in session or default to Bendahara/Admin
           const savedUserId = sessionStorage.getItem('active_user_id');
           const found = mappedUsers.find(u => u.id === savedUserId);
           setCurrentUser(found || mappedUsers.find(u => u.role === 'BENDAHARA') || mappedUsers[0]);
@@ -80,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchUserRole = (role: UserRole, unitId?: string | null) => {
-    let match = usersList.find(u => {
+    const match = usersList.find(u => {
       if (u.role !== role) return false;
       if (role === 'OPERATOR' && unitId) {
         return u.unit_id === unitId;
@@ -93,29 +91,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // RBAC Permission checks
+  const isOperator = currentUser?.role === 'OPERATOR';
+  const isBendahara = currentUser?.role === 'BENDAHARA' || currentUser?.role === 'ADMIN';
+  const canApprove = isBendahara;
+  const canDisburse = isBendahara || currentUser?.role === 'PENGELUARAN';
+  const canManageSettings = isBendahara;
+
+  // Strict RBAC: Operator can only access their unit
   const canAccessUnit = (unitId: string): boolean => {
     if (!currentUser) return false;
-    if (currentUser.role === 'ADMIN' || currentUser.role === 'BENDAHARA' || currentUser.role === 'PENGELUARAN') {
-      return true;
-    }
-    // Operator can only access their designated unit
+    if (isBendahara) return true;
     return currentUser.unit_id === unitId;
   };
 
-  const canPerformAnalysis = currentUser?.role === 'BENDAHARA' || currentUser?.role === 'ADMIN';
-  const canApprove = currentUser?.role === 'BENDAHARA' || currentUser?.role === 'ADMIN';
-  const canDisburse = currentUser?.role === 'PENGELUARAN' || currentUser?.role === 'ADMIN';
-  const canManageSettings = currentUser?.role === 'ADMIN';
-
   const canManageDraft = (submissionUnitId: string, submissionStatus: string): boolean => {
     if (!currentUser) return false;
-    if (submissionStatus !== 'Draft') return false; // Once submitted, follow audit workflow
-    if (currentUser.role === 'ADMIN') return true;
-    if (currentUser.role === 'OPERATOR') {
-      return currentUser.unit_id === submissionUnitId;
-    }
-    return false;
+    if (submissionStatus !== 'Draft') return false;
+    if (isBendahara) return true;
+    return currentUser.unit_id === submissionUnitId;
   };
 
   return (
@@ -126,11 +119,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentUser: handleSetCurrentUser,
         switchUserRole,
         isLoading,
-        canAccessUnit,
-        canPerformAnalysis,
+        isOperator,
+        isBendahara,
         canApprove,
         canDisburse,
         canManageSettings,
+        canAccessUnit,
         canManageDraft,
       }}
     >

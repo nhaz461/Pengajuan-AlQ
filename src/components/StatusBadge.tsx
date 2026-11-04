@@ -58,34 +58,44 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
   );
 };
 
-// SSH Status Badge: Hijau, Merah, Kuning (Section F)
+// SSH Status Badge: Sesuai, Di Atas, Di Bawah, Belum Ada (Section E)
 export const SSHBadge: React.FC<{
   status?: SSHStatus;
   diff?: number | null;
+  percentageDiff?: number | null;
   size?: 'sm' | 'md';
-}> = ({ status = 'BELUM_DITEMUKAN', diff, size = 'sm' }) => {
+}> = ({ status = 'BELUM_ADA', diff, percentageDiff, size = 'sm' }) => {
   if (status === 'SESUAI') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Harga sesuai atau di bawah standar SSH">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Harga pengajuan sama dengan acuan standar SSH">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-        Sesuai SSH
+        SESUAI SSH
       </span>
     );
   }
 
-  if (status === 'MELEBIHI') {
+  if (status === 'DI_ATAS' || status === 'MELEBIHI') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" title={`Melebihi SSH: +Rp${Number(diff || 0).toLocaleString('id-ID')}`}>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" title={`Harga melebihi acuan SSH: +Rp${Number(diff || 0).toLocaleString('id-ID')} (${percentageDiff ? Math.round(percentageDiff) : 0}%)`}>
         <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-        Melebihi SSH {diff ? `(+Rp${Number(diff).toLocaleString('id-ID')})` : ''}
+        DI ATAS SSH {diff ? `(+Rp${Number(diff).toLocaleString('id-ID')})` : ''}
+      </span>
+    );
+  }
+
+  if (status === 'DI_BAWAH') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title={`Harga di bawah acuan SSH (efisiensi): -Rp${Math.abs(Number(diff || 0)).toLocaleString('id-ID')}`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+        DI BAWAH SSH
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Standar belum ditemukan di Master SSH">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-      Belum Ada SSH
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200" title="Item belum memiliki referensi harga standar di Master SSH">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+      BELUM ADA SSH
     </span>
   );
 };

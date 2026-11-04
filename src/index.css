@@ -28,10 +28,16 @@
 
 /* Print styling for receipts & summary */
 @media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
   .no-print {
     display: none !important;
   }
   body {
     background: #FFFFFF !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 }

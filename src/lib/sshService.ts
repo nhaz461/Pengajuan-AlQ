@@ -7,6 +7,7 @@ export interface SSHCheckResult {
   sshItem: MasterSSH | null;
   sshPrice: number | null;
   diff: number | null;
+  percentageDiff: number | null;
   candidates: MasterSSH[];
   message: string;
 }
@@ -71,16 +72,17 @@ export const sshService = {
     if (error) throw error;
   },
 
-  // Automatic SSH Price Checker
+  // Automatic SSH Price Checker with 4-State Analysis (Section E)
   checkPriceAgainstSSH(unitPrice: number, itemName: string, unit: string, allSSH: MasterSSH[]): SSHCheckResult {
     if (!itemName || allSSH.length === 0) {
       return {
-        status: 'BELUM_DITEMUKAN',
+        status: 'BELUM_ADA',
         sshItem: null,
         sshPrice: null,
         diff: null,
+        percentageDiff: null,
         candidates: [],
-        message: 'Belum diperiksa'
+        message: 'Belum ada referensi standar harga di Master SSH'
       };
     }
 
@@ -98,12 +100,13 @@ export const sshService = {
 
     if (candidates.length === 0) {
       return {
-        status: 'BELUM_DITEMUKAN',
+        status: 'BELUM_ADA',
         sshItem: null,
         sshPrice: null,
         diff: null,
+        percentageDiff: null,
         candidates: [],
-        message: 'Standar belum ditemukan di Master SSH'
+        message: 'Item belum memiliki referensi harga standar di Master SSH'
       };
     }
 
@@ -113,24 +116,37 @@ export const sshService = {
 
     const sshPrice = Number(best.harga_standar);
     const diff = unitPrice - sshPrice;
+    const percentageDiff = sshPrice > 0 ? (diff / sshPrice) * 100 : 0;
 
-    if (diff > 0) {
-      return {
-        status: 'MELEBIHI',
-        sshItem: best,
-        sshPrice: sshPrice,
-        diff: diff,
-        candidates: candidates,
-        message: `Harga melebihi SSH sebesar Rp${diff.toLocaleString('id-ID')} (${best.nama_barang} @ Rp${sshPrice.toLocaleString('id-ID')})`
-      };
-    } else {
+    if (diff === 0) {
       return {
         status: 'SESUAI',
         sshItem: best,
         sshPrice: sshPrice,
-        diff: diff,
+        diff: 0,
+        percentageDiff: 0,
         candidates: candidates,
-        message: `Harga sesuai standar SSH (${best.nama_barang} @ Rp${sshPrice.toLocaleString('id-ID')})`
+        message: `Harga pengajuan sama persis dengan standar SSH (${best.nama_barang} @ Rp${sshPrice.toLocaleString('id-ID')})`
+      };
+    } else if (diff > 0) {
+      return {
+        status: 'DI_ATAS',
+        sshItem: best,
+        sshPrice: sshPrice,
+        diff: diff,
+        percentageDiff: percentageDiff,
+        candidates: candidates,
+        message: `Harga pengajuan melebihi standar SSH sebesar +Rp${diff.toLocaleString('id-ID')} (+${Math.round(percentageDiff)}%) (${best.nama_barang} @ Rp${sshPrice.toLocaleString('id-ID')})`
+      };
+    } else {
+      return {
+        status: 'DI_BAWAH',
+        sshItem: best,
+        sshPrice: sshPrice,
+        diff: diff,
+        percentageDiff: percentageDiff,
+        candidates: candidates,
+        message: `Harga pengajuan lebih efisien/di bawah SSH sebesar -Rp${Math.abs(diff).toLocaleString('id-ID')} (${Math.round(percentageDiff)}%) (${best.nama_barang} @ Rp${sshPrice.toLocaleString('id-ID')})`
       };
     }
   },

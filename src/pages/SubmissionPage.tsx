@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { databaseService } from '../lib/databaseService';
-import { excelService, ParsedExcelRow } from '../lib/excelService';
+import { excelService, ParsedExcelRow, ExcelImportResult } from '../lib/excelService';
 import { sshService } from '../lib/sshService';
 import { useAuth } from '../lib/authContext';
 import { Unit, FiscalYear, Submission, SubmissionItem, MasterSSH } from '../types/database';
@@ -77,14 +77,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [parsingExcel, setParsingExcel] = useState(false);
-  const [excelPreview, setExcelPreview] = useState<{
-    fileName: string;
-    parsedItems: ParsedExcelRow[];
-    totalValid: number;
-    totalErrors: number;
-    totalAmount: number;
-    metadata?: any;
-  } | null>(null);
+  const [excelPreview, setExcelPreview] = useState<ExcelImportResult | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -379,14 +372,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
     setParsingExcel(true);
     try {
       const result = await excelService.parseExcelFile(file);
-      setExcelPreview({
-        fileName: result.fileName,
-        parsedItems: result.parsedItems,
-        totalValid: result.totalValid,
-        totalErrors: result.totalErrors,
-        totalAmount: result.totalCalculatedAmount,
-        metadata: result.metadata
-      });
+      setExcelPreview(result);
     } catch (err: any) {
       alert(`Format Excel tidak valid: ${err.message}`);
       setExcelPreview(null);
@@ -435,7 +421,8 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
 
     // Apply metadata if detected
     if (excelPreview.metadata?.namaKegiatan && !formData.activity_name) {
-      setFormData(prev => ({ ...prev, activity_name: excelPreview.metadata.namaKegiatan }));
+      const detectedActivity = excelPreview.metadata.namaKegiatan;
+      setFormData(prev => ({ ...prev, activity_name: detectedActivity }));
     }
 
     setShowExcelModal(false);
@@ -1021,21 +1008,58 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
               {/* Preview table */}
               {excelPreview && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs bg-slate-100 p-2.5 rounded-lg">
-                    <span className="font-semibold text-slate-700">
-                      Total Item Ditemukan: {excelPreview.parsedItems.length} baris
-                    </span>
-                    <span className="font-mono font-bold text-finance-navy">
-                      Total: Rp{excelPreview.totalAmount.toLocaleString('id-ID')}
-                    </span>
+                  {/* 5 Checkpoints Automatic Validation Summary (Section 1.D) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                    <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-center">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Total Baris File</span>
+                      <span className="font-mono font-bold text-slate-800 text-sm">{excelPreview.totalRowsInFile} baris</span>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg text-center">
+                      <span className="text-[10px] text-emerald-700 font-semibold block uppercase">Item Berhasil Dibaca</span>
+                      <span className="font-mono font-bold text-emerald-700 text-sm">{excelPreview.totalValid} item</span>
+                    </div>
+                    <div className={`p-2.5 rounded-lg text-center border ${excelPreview.totalErrors > 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                      <span className="text-[10px] font-semibold block uppercase">Item Gagal / Error</span>
+                      <span className="font-mono font-bold text-sm">{excelPreview.totalErrors} item</span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-center">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Total Nominal di Excel</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs truncate block" title={excelPreview.excelGrandTotal ? `Rp${excelPreview.excelGrandTotal.toLocaleString('id-ID')}` : 'Tidak tertera'}>
+                        {excelPreview.excelGrandTotal ? `Rp${excelPreview.excelGrandTotal.toLocaleString('id-ID')}` : 'Tidak tertera'}
+                      </span>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-center">
+                      <span className="text-[10px] text-finance-blue font-semibold block uppercase">Total Hasil Import</span>
+                      <span className="font-mono font-bold text-finance-navy text-xs truncate block">
+                        Rp{excelPreview.importedGrandTotal.toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </div>
 
-                  {excelPreview.totalErrors > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-lg text-xs flex items-center gap-2">
+                  {/* Discrepancy Warning if Excel total differs from Imported items */}
+                  {excelPreview.excelGrandTotal !== null && Math.abs(excelPreview.discrepancy) > 1 && (
+                    <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3 rounded-lg text-xs flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span>
-                        Ditemukan {excelPreview.totalErrors} baris yang tidak lengkap atau tidak valid. Baris tersebut akan dilewati atau diperbaiki manual.
-                      </span>
+                      <div>
+                        <strong>Peringatan Selisih Nominal Excel:</strong> Terdapat selisih sebesar{' '}
+                        <span className="font-mono font-bold">Rp{Math.abs(excelPreview.discrepancy).toLocaleString('id-ID')}</span>{' '}
+                        antara total ringkasan pada berkas Excel (Rp{excelPreview.excelGrandTotal.toLocaleString('id-ID')}) dengan total kalkulasi item yang terbaca (Rp{excelPreview.importedGrandTotal.toLocaleString('id-ID')}).
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row errors listing */}
+                  {excelPreview.rowErrors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-xs space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-red-900">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                        <span>Catatan Validasi Baris Excel ({excelPreview.rowErrors.length}):</span>
+                      </div>
+                      <div className="max-h-24 overflow-y-auto space-y-0.5 text-[11px] pl-5 list-disc">
+                        {excelPreview.rowErrors.map((err, errIdx) => (
+                          <div key={errIdx}>• {err.message}</div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -1044,12 +1068,14 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                       <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] sticky top-0">
                         <tr>
                           <th className="px-3 py-2">No</th>
+                          <th className="px-3 py-2">Kategori</th>
                           <th className="px-3 py-2">Uraian Barang/Kegiatan</th>
                           <th className="px-3 py-2 text-right">Harga (Rp)</th>
                           <th className="px-3 py-2">Uji SSH</th>
                           <th className="px-3 py-2 text-center">Vol</th>
                           <th className="px-3 py-2">Satuan</th>
                           <th className="px-3 py-2 text-right">Jumlah (Rp)</th>
+                          <th className="px-3 py-2">Keterangan</th>
                           <th className="px-3 py-2">Status</th>
                         </tr>
                       </thead>
@@ -1058,26 +1084,28 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                           const sshCheck = sshService.checkPriceAgainstSSH(item.hargaSatuan, item.uraian, item.satuan, allSSH);
                           return (
                             <tr key={idx} className={item.errors.length > 0 ? 'bg-red-50/50' : ''}>
-                              <td className="px-3 py-2 text-slate-500">{item.no || idx + 1}</td>
+                              <td className="px-3 py-2 text-slate-500 font-mono">{item.item_number || idx + 1}</td>
+                              <td className="px-3 py-2 text-slate-600 font-medium">{item.kategori}</td>
                               <td className="px-3 py-2 font-medium text-slate-800">{item.uraian}</td>
                               <td className="px-3 py-2 text-right font-mono">
                                 Rp{item.hargaSatuan.toLocaleString('id-ID')}
                               </td>
                               <td className="px-3 py-2">
-                                <SSHBadge status={sshCheck.status} diff={sshCheck.diff} size="sm" />
+                                <SSHBadge status={sshCheck.status} diff={sshCheck.diff} percentageDiff={sshCheck.percentageDiff} size="sm" />
                               </td>
-                              <td className="px-3 py-2 text-center">{item.volume}</td>
+                              <td className="px-3 py-2 text-center font-mono font-semibold">{item.volume}</td>
                               <td className="px-3 py-2 text-slate-600">{item.satuan}</td>
                               <td className="px-3 py-2 text-right font-mono font-semibold">
                                 Rp{item.jumlah.toLocaleString('id-ID')}
                               </td>
+                              <td className="px-3 py-2 text-slate-500 text-[11px] truncate max-w-[150px]">{item.keterangan || '-'}</td>
                               <td className="px-3 py-2">
                                 {item.errors.length === 0 ? (
-                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">
                                     Valid
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-medium" title={item.errors.join(', ')}>
+                                  <span className="text-[10px] text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-bold" title={item.errors.join(', ')}>
                                     Error
                                   </span>
                                 )}

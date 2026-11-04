@@ -42,7 +42,13 @@ export type SubmissionStatus =
   | 'Ditolak'
   | 'Dibatalkan';
 
-export type SSHStatus = 'SESUAI' | 'MELEBIHI' | 'BELUM_DITEMUKAN';
+export type SSHStatus =
+  | 'SESUAI'
+  | 'DI_ATAS'
+  | 'DI_BAWAH'
+  | 'BELUM_ADA'
+  | 'MELEBIHI'
+  | 'BELUM_DITEMUKAN';
 
 export interface MultiFactor {
   id: string;

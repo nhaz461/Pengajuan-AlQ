@@ -360,11 +360,12 @@ export const databaseService = {
     submissionId: string;
     analysisItems: Omit<AnalysisItem, 'id' | 'submission_id'>[];
     treasurerNotes: string;
-    saveToDraftSiapDicairkan: boolean;
+    saveToDraftSiapDicairkan?: boolean;
+    targetStatus?: SubmissionStatus;
     actorName: string;
     actorRole: string;
   }): Promise<void> {
-    const { submissionId, analysisItems, treasurerNotes, saveToDraftSiapDicairkan, actorName, actorRole } = params;
+    const { submissionId, analysisItems, treasurerNotes, saveToDraftSiapDicairkan, targetStatus, actorName, actorRole } = params;
 
     const existing = await this.getSubmissionById(submissionId);
     if (!existing) throw new Error('Pengajuan tidak ditemukan');
@@ -374,7 +375,12 @@ export const databaseService = {
       .filter(item => item.item_type !== 'REMOVED')
       .reduce((sum, item) => sum + Number(item.total_amount), 0);
 
-    const newStatus: SubmissionStatus = saveToDraftSiapDicairkan ? 'Draft Siap Dicairkan' : 'Sedang Dianalisis';
+    let newStatus: SubmissionStatus = 'Sedang Dianalisis';
+    if (targetStatus) {
+      newStatus = targetStatus;
+    } else if (saveToDraftSiapDicairkan) {
+      newStatus = 'Draft Siap Dicairkan';
+    }
     const now = new Date().toISOString();
 
     // 1. Delete previous analysis items for this submission to maintain clean idempotent state

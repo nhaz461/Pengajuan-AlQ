@@ -318,6 +318,64 @@ export const databaseService = {
     });
   },
 
+  // Delete submission permanently (Admin / Bendahara Umum)
+  async deleteSubmission(submissionId: string, actorName: string, actorRole: string): Promise<void> {
+    const existing = await this.getSubmissionById(submissionId);
+    if (!existing) throw new Error('Pengajuan tidak ditemukan');
+
+    // 1. Delete associated child records safely
+    await supabase.from('disbursements').delete().eq('submission_id', submissionId);
+    await supabase.from('analysis_items').delete().eq('submission_id', submissionId);
+    await supabase.from('submission_items').delete().eq('submission_id', submissionId);
+
+    // 2. Delete the parent submission
+    const { error } = await supabase
+      .from('submissions')
+      .delete()
+      .eq('id', submissionId);
+
+    if (error) throw error;
+
+    // 3. Log audit
+    await this.logAudit({
+      userName: actorName,
+      userRole: actorRole,
+      action: 'DELETE_SUBMISSION',
+      entity: 'submission',
+      entityId: submissionId,
+      oldValue: existing,
+      note: `Pengajuan dihapus secara permanen oleh Bendahara/Admin: ${existing.submission_number} (${existing.activity_name}) - Unit ${existing.unit_name}`
+    });
+  },
+
+  // Cancel "Draft Siap Dicairkan" and return to "Diajukan" (Analysis stage)
+  async cancelDraftSiapDicairkan(submissionId: string, actorName: string, actorRole: string): Promise<void> {
+    const existing = await this.getSubmissionById(submissionId);
+    if (!existing) throw new Error('Pengajuan tidak ditemukan');
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('submissions')
+      .update({
+        status: 'Diajukan',
+        updated_at: now
+      })
+      .eq('id', submissionId);
+
+    if (error) throw error;
+
+    await this.logAudit({
+      userName: actorName,
+      userRole: actorRole,
+      action: 'CANCEL_DRAFT_SIAP_DICAIRKAN',
+      entity: 'submission',
+      entityId: submissionId,
+      oldValue: { status: existing.status },
+      newValue: { status: 'Diajukan' },
+      note: `Status Draft Siap Dicairkan dibatalkan dan dikembalikan ke antrean Analisis Pengajuan: ${existing.submission_number}`
+    });
+  },
+
   // Submit draft to 'Diajukan'
   async submitDraft(submissionId: string, actorName: string, actorRole: string): Promise<void> {
     const existing = await this.getSubmissionById(submissionId);

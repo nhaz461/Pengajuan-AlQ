@@ -655,13 +655,13 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
           MODAL: CREATE / EDIT SUBMISSION WITH MULTI-FACTOR ITEMS
       ========================================================================= */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 my-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[94vh] flex flex-col border border-slate-200 my-auto">
             {/* Modal Header */}
-            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-xl shrink-0">
+            <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-xl shrink-0">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-finance-blue" />
-                <h2 className="text-base font-bold text-finance-navy">
+                <h2 className="text-sm sm:text-base font-bold text-finance-navy">
                   {editingSubmissionId ? 'Edit Draft Usulan Pengajuan' : 'Form Pengajuan Anggaran Baru'}
                 </h2>
               </div>
@@ -674,9 +674,9 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
             </div>
 
             {/* Modal Body (Scrollable) */}
-            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+            <div className="p-3 sm:p-5 overflow-y-auto flex-1 space-y-4">
               {/* Header Info Form */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg border border-slate-200">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor Pengajuan</label>
                   <input
@@ -779,7 +779,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
               </div>
 
               {/* Items Section Header with Excel Import Button */}
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-finance-navy">Rincian Barang & Biaya Belanja</h3>
                   <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
@@ -787,7 +787,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {/* Upload Excel Button (Section G) */}
                   <button
                     type="button"
@@ -809,18 +809,27 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                 </div>
               </div>
 
-              {/* Items List */}
+              {/* Items List - Fully Responsive for Mobile & Desktop */}
               <div className="space-y-3">
                 {items.map((item, idx) => {
                   const sshCheck = sshService.checkPriceAgainstSSH(Number(item.unit_price) || 0, item.item_name, item.unit, allSSH);
                   return (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2.5">
-                      <div className="grid grid-cols-12 gap-2 items-start">
-                        <div className="col-span-1 text-center font-bold text-slate-400 text-xs pt-2">
-                          #{idx + 1}
-                        </div>
+                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                        <span className="font-bold text-slate-600 text-xs">Item Belanja #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(idx)}
+                          className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded text-xs transition-colors"
+                          title="Hapus baris item ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="text-[11px] font-medium">Hapus</span>
+                        </button>
+                      </div>
 
-                        <div className="col-span-11 sm:col-span-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                        <div className="sm:col-span-6">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
                             Uraian Barang / Belanja Kegiatan <span className="text-red-500">*</span>
                           </label>
@@ -829,11 +838,11 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                             placeholder="Nama barang / kegiatan..."
                             value={item.item_name}
                             onChange={(e) => handleUpdateItem(idx, 'item_name', e.target.value)}
-                            className="w-full text-xs border border-slate-200 rounded p-1.5 focus:border-finance-blue"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:border-finance-blue focus:ring-1 focus:ring-finance-blue"
                           />
                         </div>
 
-                        <div className="col-span-6 sm:col-span-3">
+                        <div className="sm:col-span-3">
                           <div className="flex items-center justify-between mb-0.5">
                             <label className="block text-[10px] font-semibold text-slate-500">
                               Harga Satuan (Rp) <span className="text-red-500">*</span>
@@ -849,7 +858,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                             placeholder="0"
                             value={item.unit_price === 0 ? '' : item.unit_price}
                             onChange={(e) => handleUpdateItem(idx, 'unit_price', e.target.value)}
-                            className={`w-full text-xs font-mono text-right border rounded p-1.5 focus:border-finance-blue font-semibold ${
+                            className={`w-full text-xs font-mono text-right border rounded-lg p-2 focus:border-finance-blue font-semibold ${
                               sshCheck.status === 'MELEBIHI' ? 'border-red-300 bg-red-50/40 text-red-700' : 'border-slate-200'
                             }`}
                           />
@@ -860,26 +869,15 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                           )}
                         </div>
 
-                        <div className="col-span-5 sm:col-span-2">
+                        <div className="sm:col-span-3">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Satuan</label>
                           <input
                             type="text"
-                            placeholder="Rim / Kotak"
+                            placeholder="Rim / Kotak / Orang"
                             value={item.unit}
                             onChange={(e) => handleUpdateItem(idx, 'unit', e.target.value)}
-                            className="w-full text-xs border border-slate-200 rounded p-1.5"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2"
                           />
-                        </div>
-
-                        <div className="col-span-1 text-right pt-4">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                            title="Hapus baris"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
                       </div>
 
@@ -901,7 +899,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                           placeholder="Keterangan rincian (opsional)..."
                           value={item.notes || ''}
                           onChange={(e) => handleUpdateItem(idx, 'notes', e.target.value)}
-                          className="w-full text-[11px] text-slate-600 border border-slate-100 bg-slate-50/50 rounded px-2 py-1"
+                          className="w-full text-[11px] text-slate-600 border border-slate-200 bg-slate-50/50 rounded-lg px-2.5 py-1.5"
                         />
                       </div>
                     </div>

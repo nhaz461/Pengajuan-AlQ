@@ -223,30 +223,29 @@ export const DraftSiapDicairkanPage: React.FC<DraftSiapDicairkanPageProps> = ({
         /* =========================================================================
             OFFICIAL DRAFT ANGGARAN SIAP DICAIRKAN (FORMAT RESMI YAYASAN)
         ========================================================================= */
-        <div className="flex justify-center">
+        <div className="w-full">
           <div
             ref={reportRef}
-            className="bg-white rounded-xl border border-slate-300 shadow-lg p-6 sm:p-8 max-w-3xl w-full text-slate-900 font-sans"
-            style={{ width: '100%', maxWidth: '820px' }}
+            className="bg-white rounded-xl border border-slate-300 shadow-md p-4 sm:p-6 lg:p-8 w-full text-slate-900 font-sans"
           >
             {/* Header Yayasan */}
-            <div className="flex items-center justify-between pb-4 border-b-2 border-slate-800">
-              <div className="flex items-center gap-3">
-                <img src="/logo.svg" alt="Logo" className="w-14 h-14" />
+            <div className="flex flex-col sm:flex-row items-center justify-between pb-4 border-b-2 border-slate-800 gap-3">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <img src="/logo.svg" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 shrink-0" />
                 <div>
-                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-finance-navy">
+                  <h2 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-finance-navy">
                     YAYASAN PENDIDIKAN ISLAM PONDOK PESANTREN AL-QUR'ANIYYAH
                   </h2>
-                  <p className="text-[11px] text-slate-600 font-medium">
+                  <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium">
                     Komp. Pesantren Al-Qur'aniyyah • Manna, Bengkulu Selatan
                   </p>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[9px] sm:text-[10px] text-slate-400">
                     Sistem Perencanaan & Disposisi Anggaran Keuangan
                   </p>
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="text-center sm:text-right shrink-0">
                 <div className="text-[10px] uppercase font-bold text-slate-400">Keterangan Dokumen</div>
                 <div className="mt-1">
                   <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold px-2.5 py-1 rounded-md inline-block">
@@ -258,16 +257,16 @@ export const DraftSiapDicairkanPage: React.FC<DraftSiapDicairkanPageProps> = ({
 
             {/* Title */}
             <div className="py-4 text-center">
-              <h1 className="text-base font-bold text-finance-navy uppercase tracking-wider">
+              <h1 className="text-sm sm:text-base font-bold text-finance-navy uppercase tracking-wider">
                 RENCANA ANGGARAN BIAYA (RAB) HASIL ANALISIS BENDAHARA UMUM
               </h1>
               <div className="text-xs text-slate-500 font-mono mt-0.5">
-                Nomor: <strong className="text-slate-900">{selectedSub.submission_number}</strong>
+                Nomor: <strong className="text-slate-900 font-bold">{selectedSub.submission_number}</strong>
               </div>
             </div>
 
             {/* Metadata Grid */}
-            <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs mb-4">
+            <div className="bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs mb-4">
               <div>
                 <span className="text-[10px] text-slate-400 block uppercase font-semibold">Unit Pemohon</span>
                 <span className="font-bold text-slate-900">{selectedSub.unit_name}</span>
@@ -284,12 +283,12 @@ export const DraftSiapDicairkanPage: React.FC<DraftSiapDicairkanPageProps> = ({
                 <span className="text-[10px] text-slate-400 block uppercase font-semibold">Penanggung Jawab</span>
                 <span className="font-semibold text-slate-900">{selectedSub.person_in_charge}</span>
               </div>
-              <div className="col-span-2 sm:col-span-4 pt-1.5 border-t border-slate-200 flex justify-between">
+              <div className="col-span-2 sm:col-span-4 pt-2 border-t border-slate-200 flex flex-col sm:flex-row justify-between gap-1">
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase font-semibold">Nama Kegiatan / Kebutuhan</span>
-                  <span className="font-bold text-slate-900 text-sm">{selectedSub.activity_name}</span>
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm">{selectedSub.activity_name}</span>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <span className="text-[10px] text-slate-400 block uppercase font-semibold">Kategori Utama</span>
                   <span className="font-medium text-slate-700">{selectedSub.category}</span>
                 </div>
@@ -297,24 +296,24 @@ export const DraftSiapDicairkanPage: React.FC<DraftSiapDicairkanPageProps> = ({
             </div>
 
             {/* Financial Summary Comparison Boxes */}
-            <div className="grid grid-cols-3 gap-2.5 text-center mb-5 font-mono">
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 font-sans block">Total Pengajuan Awal Unit</span>
-                <span className="text-sm font-bold text-slate-800 block mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center mb-5 font-mono">
+              <div className="bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Total Pengajuan Awal Unit</span>
+                <span className="text-sm sm:text-base font-bold text-slate-800 block mt-1">
                   Rp{totalOriginal.toLocaleString('id-ID')}
                 </span>
               </div>
 
-              <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-300">
+              <div className="bg-emerald-50/70 p-2.5 sm:p-3 rounded-lg border border-emerald-300">
                 <span className="text-[10px] text-emerald-800 font-sans font-bold block">Total Disetujui (Siap Dicairkan)</span>
-                <span className="text-sm font-bold text-emerald-900 block mt-1">
+                <span className="text-sm sm:text-base font-black text-emerald-900 block mt-1">
                   Rp{totalApproved.toLocaleString('id-ID')}
                 </span>
               </div>
 
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 font-sans block">Selisih Efisiensi Nominal</span>
-                <span className={`text-sm font-bold block mt-1 ${selisih < 0 ? 'text-red-600' : 'text-indigo-900'}`}>
+              <div className="bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Selisih Efisiensi Nominal</span>
+                <span className={`text-sm sm:text-base font-bold block mt-1 ${selisih < 0 ? 'text-red-600' : 'text-indigo-900'}`}>
                   {selisih < 0 ? '-' : ''}Rp{Math.abs(selisih).toLocaleString('id-ID')}
                 </span>
               </div>
@@ -327,66 +326,68 @@ export const DraftSiapDicairkanPage: React.FC<DraftSiapDicairkanPageProps> = ({
                 const subtotal = catItems.reduce((sum, it) => sum + Number(it.total_amount || 0), 0);
 
                 return (
-                  <div key={catName} className="border border-slate-200 rounded-lg overflow-hidden">
-                    <div className="bg-slate-100 px-3 py-1.5 flex items-center justify-between font-bold text-xs text-finance-navy border-b border-slate-200">
+                  <div key={catName} className="border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+                    <div className="bg-slate-100 px-3 py-2 flex items-center justify-between font-bold text-xs text-finance-navy border-b border-slate-200">
                       <span>Kategori: {catName}</span>
-                      <span className="font-mono text-slate-700">Subtotal: Rp{subtotal.toLocaleString('id-ID')}</span>
+                      <span className="font-mono text-slate-800 font-extrabold">Subtotal: Rp{subtotal.toLocaleString('id-ID')}</span>
                     </div>
 
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50 text-slate-600 text-[10px] uppercase font-semibold border-b border-slate-200">
-                        <tr>
-                          <th className="px-3 py-2 w-8 text-center">No</th>
-                          <th className="px-3 py-2">Uraian Kebutuhan</th>
-                          <th className="px-3 py-2 text-right">Harga Satuan</th>
-                          <th className="px-3 py-2 text-center">Rincian Multi-Faktor Volume</th>
-                          <th className="px-3 py-2 text-center">SSH</th>
-                          <th className="px-3 py-2 text-right">Jumlah (Rp)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {catItems.map((item: any, idx: number) => {
-                          const factors: any[] = item.multi_factors
-                            ? (typeof item.multi_factors === 'string' ? JSON.parse(item.multi_factors) : item.multi_factors)
-                            : [];
-
-                          return (
-                            <tr key={idx} className="hover:bg-slate-50/50">
-                              <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
-                              <td className="px-3 py-2">
-                                <div className="font-semibold text-slate-800">{item.item_name}</div>
-                                {item.change_reason && (
-                                  <div className="text-[10px] text-amber-700 italic">
-                                    *Catatan: {item.change_reason}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono text-slate-700">
-                                Rp{Number(item.unit_price).toLocaleString('id-ID')}
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono text-slate-600">
-                                {factors.length > 0 ? (
-                                  <div className="text-[11px] leading-tight">
-                                    {factors.map(f => `${f.value} ${f.satuan || f.name}`).join(' × ')}
-                                    <span className="block text-[10px] text-finance-blue font-bold">
-                                      (Vol: {item.volume})
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full min-w-[700px] text-xs text-left">
+                        <thead className="bg-slate-50 text-slate-600 text-[10px] uppercase font-semibold border-b border-slate-200">
+                          <tr>
+                            <th className="px-3 py-2 w-8 text-center">No</th>
+                            <th className="px-3 py-2">Uraian Kebutuhan</th>
+                            <th className="px-3 py-2 text-right">Harga Satuan</th>
+                            <th className="px-3 py-2 text-center">Rincian Multi-Faktor Volume</th>
+                            <th className="px-3 py-2 text-center">SSH</th>
+                            <th className="px-3 py-2 text-right">Jumlah (Rp)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {catItems.map((item: any, idx: number) => {
+                            const factors: any[] = item.multi_factors
+                              ? (typeof item.multi_factors === 'string' ? JSON.parse(item.multi_factors) : item.multi_factors)
+                              : [];
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
+                                <td className="px-3 py-2 font-medium text-slate-900">
+                                  {item.item_name}
+                                  {item.change_reason && (
+                                    <span className="block text-[10px] text-indigo-700 italic">
+                                      Catatan: {item.change_reason}
                                     </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-slate-800 whitespace-nowrap">
+                                  Rp{Number(item.unit_price).toLocaleString('id-ID')}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <div className="flex flex-wrap items-center justify-center gap-1 font-mono text-[10px]">
+                                    {factors.length > 0 ? (
+                                      factors.map((f, fi) => (
+                                        <span key={fi} className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded">
+                                          <strong>{f.value}</strong> {f.satuan || f.name}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span>{item.volume} {item.unit}</span>
+                                    )}
                                   </div>
-                                ) : (
-                                  `${item.volume} ${item.unit}`
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <SSHBadge status={item.ssh_status} diff={item.ssh_diff} />
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">
-                                Rp{Number(item.total_amount).toLocaleString('id-ID')}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                </td>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  <SSHBadge status={item.ssh_status} size="sm" />
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-finance-navy whitespace-nowrap">
+                                  Rp{Number(item.total_amount).toLocaleString('id-ID')}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 );
               })}

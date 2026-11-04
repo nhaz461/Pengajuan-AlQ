@@ -329,8 +329,8 @@ export const DisbursementPage: React.FC<DisbursementPageProps> = ({ onNavigate }
 
       {/* Record Disbursement Modal */}
       {showModal && selectedSub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-5 border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-4 sm:p-5 border border-slate-200 max-h-[92vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-finance-blue" />

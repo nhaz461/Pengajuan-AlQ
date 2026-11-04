@@ -257,8 +257,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Small Statistic Cards in 2 columns on Mobile, 4 columns on Tablet/Desktop (Section C & L) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      {/* Small Statistic Cards: 2 cols on mobile, 4 on tablet/laptop, 7 on widescreen */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
         {/* Card 1: Jumlah Pengajuan */}
         <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500">

@@ -51,7 +51,7 @@ const MainLayout: React.FC = () => {
       <Navbar onToggleSidebar={() => setIsOpenMobile(prev => !prev)} />
 
       {/* Main Body Layout */}
-      <div className={`flex-1 flex w-full transition-all ${activeTab === 'analysis' ? 'max-w-none px-2 sm:px-4 lg:px-6' : 'max-w-7xl mx-auto'}`}>
+      <div className="flex-1 flex w-full">
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -60,8 +60,8 @@ const MainLayout: React.FC = () => {
           onCloseMobile={() => setIsOpenMobile(false)}
         />
 
-        {/* Dynamic Page Content */}
-        <main className={`flex-1 ${activeTab === 'analysis' ? 'p-2 sm:p-4 lg:p-6' : 'p-4 sm:p-6 lg:p-8'} overflow-y-auto max-w-full min-w-0`}>
+        {/* Dynamic Page Content - Full Width & Responsive */}
+        <main className="flex-1 min-w-0 w-full p-3 sm:p-5 lg:p-6 pb-24 lg:pb-10 overflow-y-auto">
           {/* Operator specific views */}
           {isOperator && activeTab === 'operator-history' && (
             <OperatorHistoryPage onNavigate={handleNavigate} />

@@ -1153,10 +1153,10 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ initialSubmissionId,
           MODAL: REVISI ITEM & MULTIPLE COMPONENTS (SECTION 2.D & 2.F)
       ========================================================================= */}
       {editingItemIndex !== null && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 my-6">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 my-auto sm:my-6 max-h-[94vh] flex flex-col">
             {/* Modal Header */}
-            <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+            <div className="bg-slate-50 px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-finance-navy uppercase tracking-wide">
                   Form Revisi Pencairan Dana
@@ -1345,7 +1345,7 @@ export const AnalysisPage: React.FC<AnalysisPageProps> = ({ initialSubmissionId,
             </div>
 
             {/* Modal Actions */}
-            <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div className="bg-slate-50 px-4 sm:px-5 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"

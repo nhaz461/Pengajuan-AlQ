@@ -156,8 +156,8 @@ export const OperatorHistoryPage: React.FC<OperatorHistoryPageProps> = ({ onNavi
 
       {/* Modal Detail for Operator */}
       {selectedSub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-5 border border-slate-200 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-4 sm:p-5 border border-slate-200 max-h-[92vh] flex flex-col my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-finance-blue" />

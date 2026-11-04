@@ -50,8 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
   return (
     <>
-      <header className="bg-white border-b border-finance-border sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <header className="bg-white border-b border-finance-border sticky top-0 z-30 shadow-xs w-full">
+        <div className="w-full px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Left: Mobile hamburger & App Brand */}
           <div className="flex items-center gap-3">
             <button

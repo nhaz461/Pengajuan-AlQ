@@ -21,7 +21,9 @@ import {
   Search,
   Filter,
   Eye,
-  Info
+  Info,
+  Undo2,
+  X
 } from 'lucide-react';
 
 interface SubmissionPageProps {
@@ -45,6 +47,11 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
   // Modal Create / Edit Submission
   const [showModal, setShowModal] = useState(false);
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
+
+  // Modal Delete State
+  const [subToDelete, setSubToDelete] = useState<Submission | null>(null);
+  const [deleteActionType, setDeleteActionType] = useState<'PERMANENT' | 'CANCEL_DRAFT'>('PERMANENT');
+  const [isProcessingDelete, setIsProcessingDelete] = useState(false);
 
   // Form Fields
   const [formData, setFormData] = useState({
@@ -345,21 +352,34 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
     }
   };
 
-  // Delete Draft
-  const handleDeleteDraft = async (sub: Submission) => {
-    if (!confirm(`Hapus permanen draft ${sub.submission_number}? Tindakan ini tidak dapat dibatalkan.`)) {
-      return;
-    }
+  // Open Delete Modal
+  const handleOpenDeleteModal = (sub: Submission) => {
+    setSubToDelete(sub);
+    setDeleteActionType('PERMANENT');
+  };
+
+  // Confirm Delete
+  const handleConfirmDelete = async () => {
+    if (!subToDelete) return;
+    setIsProcessingDelete(true);
     try {
-      await databaseService.deleteDraft(
-        sub.id,
-        currentUser?.full_name || 'Operator',
-        currentUser?.role || 'OPERATOR'
-      );
+      const actorName = currentUser?.full_name || 'Administrator Yayasan';
+      const actorRole = currentUser?.role || 'BENDAHARA';
+
+      if (deleteActionType === 'CANCEL_DRAFT' && subToDelete.status !== 'Draft' && subToDelete.status !== 'Diajukan') {
+        await databaseService.cancelDraftSiapDicairkan(subToDelete.id, actorName, actorRole);
+        alert(`Status pengajuan ${subToDelete.submission_number} berhasil dikembalikan ke status 'Diajukan'.`);
+      } else {
+        await databaseService.deleteSubmission(subToDelete.id, actorName, actorRole);
+        alert(`Pengajuan ${subToDelete.submission_number} (${subToDelete.activity_name}) berhasil dihapus permanen dari sistem.`);
+      }
+
+      setSubToDelete(null);
       await loadData();
-      alert('Draft pengajuan berhasil dihapus.');
     } catch (err: any) {
-      alert(`Gagal menghapus draft: ${err.message}`);
+      alert(`Gagal memproses penghapusan pengajuan: ${err.message}`);
+    } finally {
+      setIsProcessingDelete(false);
     }
   };
 
@@ -592,7 +612,7 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* If it's a Draft, allow Edit, Submit, and Delete */}
+                          {/* If it's a Draft, allow Edit and Submit */}
                           {sub.status === 'Draft' && isOwnerDraft && (
                             <>
                               <button
@@ -609,13 +629,6 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                               >
                                 <Send className="w-3 h-3" />
                                 <span>Ajukan</span>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteDraft(sub)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded"
-                                title="Hapus Draft"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
@@ -640,6 +653,18 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                                 <span>Analisis</span>
                               </button>
                             )}
+
+                          {/* Tombol Hapus: Bendahara / Admin dapat menghapus semua status; Operator dapat menghapus draft miliknya */}
+                          {(currentUser?.role === 'BENDAHARA' || currentUser?.role === 'ADMIN' || (sub.status === 'Draft' && isOwnerDraft)) && (
+                            <button
+                              onClick={() => handleOpenDeleteModal(sub)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded transition-colors"
+                              title="Hapus Berkas Pengajuan"
+                            >
+                              <Trash2 className="w-3 h-3 text-red-600" />
+                              <span>Hapus</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1138,6 +1163,168 @@ export const SubmissionPage: React.FC<SubmissionPageProps> = ({ onNavigate }) =>
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Konfirmasi & Terapkan ke Form</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL: DELETE / CANCEL SUBMISSION CONFIRMATION
+      ========================================================================= */}
+      {subToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 my-auto">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Hapus Berkas Pengajuan</h3>
+                  <p className="text-xs text-slate-500">Konfirmasi tindakan penghapusan berkas pengajuan</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSubToDelete(null)}
+                disabled={isProcessingDelete}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 space-y-4 text-xs">
+              {/* Selected Submission Info */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">Nomor Surat:</span>
+                  <span className="font-mono font-bold text-finance-navy">{subToDelete.submission_number}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Unit Pemohon:</span>
+                  <span className="font-semibold text-slate-800">{subToDelete.unit_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Agenda Kegiatan:</span>
+                  <span className="font-semibold text-slate-800 text-right max-w-[240px] truncate">{subToDelete.activity_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Status Berkas:</span>
+                  <StatusBadge status={subToDelete.status} size="sm" />
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+                  <span className="text-slate-500 font-medium">Total Diajukan:</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm">
+                    Rp{Number(subToDelete.original_total).toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Choices for Advanced Statuses (Siap Dicairkan, Sedang Dianalisis, etc.) */}
+              {subToDelete.status !== 'Draft' && subToDelete.status !== 'Diajukan' ? (
+                <div className="space-y-2.5">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                    Pilih Opsi Tindakan:
+                  </label>
+
+                  {/* Option 1: Hapus Permanen */}
+                  <div
+                    onClick={() => setDeleteActionType('PERMANENT')}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                      deleteActionType === 'PERMANENT'
+                        ? 'border-red-500 bg-red-50/40 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="deleteChoiceSubmission"
+                      checked={deleteActionType === 'PERMANENT'}
+                      onChange={() => setDeleteActionType('PERMANENT')}
+                      className="mt-1 text-red-600 focus:ring-red-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-red-700 flex items-center gap-1.5">
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus Permanen Berkas Pengajuan</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                        Menghapus seluruh berkas pengajuan ini, rincian belanja, dan hasil analisisnya secara permanen dari database.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Batalkan Status & Kembalikan ke Diajukan */}
+                  <div
+                    onClick={() => setDeleteActionType('CANCEL_DRAFT')}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                      deleteActionType === 'CANCEL_DRAFT'
+                        ? 'border-amber-500 bg-amber-50/40 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="deleteChoiceSubmission"
+                      checked={deleteActionType === 'CANCEL_DRAFT'}
+                      onChange={() => setDeleteActionType('CANCEL_DRAFT')}
+                      className="mt-1 text-amber-600 focus:ring-amber-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-amber-800 flex items-center gap-1.5">
+                        <Undo2 className="w-3.5 h-3.5" />
+                        <span>Batalkan Status & Kembalikan ke 'Diajukan'</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                        Mengembalikan berkas ke antrean status "Diajukan" agar dapat dianalisis ulang atau diperbaiki. Data rincian tidak akan dihapus.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-relaxed">
+                    Tindakan ini akan <strong>menghapus permanen</strong> berkas pengajuan ini beserta seluruh rincian item di dalamnya dari sistem. Data yang dihapus tidak dapat dipulihkan.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSubToDelete(null)}
+                disabled={isProcessingDelete}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+
+              {deleteActionType === 'PERMANENT' || subToDelete.status === 'Draft' || subToDelete.status === 'Diajukan' ? (
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isProcessingDelete}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isProcessingDelete ? 'Menghapus...' : 'Ya, Hapus Permanen'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isProcessingDelete}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-md transition-colors disabled:opacity-50"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                  <span>{isProcessingDelete ? 'Memproses...' : 'Ya, Kembalikan ke Diajukan'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
